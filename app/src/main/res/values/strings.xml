@@ -199,6 +199,12 @@
     <string name="skill_timer_query_name">Timer %1$s expires in %2$s</string>
     <string name="skill_timer_query_last">The last timer expires in %1$s</string>
     <string name="skill_timer_none_canceled">OK, no timer was canceled</string>
+    <string name="skill_timer_opened_clock_app">Here are the timers in the Clock app</string>
+    <string name="pref_timer_app">Timer app</string>
+    <string name="pref_timer_app_clock">Clock app</string>
+    <string name="pref_timer_app_clock_description">Timers are set in the system Clock app and ring even if Dicio is closed. Asking how much time is left or to cancel a timer opens the Clock app</string>
+    <string name="pref_timer_app_dicio">Dicio</string>
+    <string name="pref_timer_app_dicio_description">Timers run inside Dicio, which can say how much time is left and cancel them</string>
     <string name="stt_service_label">Dicio offline speech recognition</string>
     <string name="wake_service_label">Dicio wake word service</string>
     <string name="wake_service_foreground_notification_summary">This notification allows the Dicio

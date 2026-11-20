@@ -6,6 +6,7 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.StringRes
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.SkillInfo
@@ -15,6 +16,7 @@ import org.dicio.skill.standard.StandardRecognizerSkill
 import org.stypox.dicio.R
 import org.stypox.dicio.sentences.Sentences
 import org.stypox.dicio.sentences.Sentences.Timer
+import org.stypox.dicio.skills.timer.TimerInfo.timerDataStore
 import org.stypox.dicio.util.StringUtils
 import org.stypox.dicio.util.getString
 import java.time.Duration
@@ -27,18 +29,28 @@ class TimerSkill(
 ) : StandardRecognizerSkill<Timer>(correspondingSkillInfo, data) {
 
     override suspend fun generateOutput(ctx: SkillContext, inputData: Timer): SkillOutput {
+        val useClockApp = ctx.android.timerDataStore.data.first().app != TimerApp.TIMER_APP_DICIO
+        // timers set in Dicio can still be queried and canceled even if the Clock app is chosen
+        val clockAppHandlesExisting = useClockApp && SET_TIMERS.isEmpty()
+
         return when (inputData) {
             is Timer.Set -> {
                 if (inputData.duration == null) {
-                    TimerOutput.SetAskDuration { setTimer(ctx, it, inputData.name) }
+                    TimerOutput.SetAskDuration { setTimer(ctx, it, inputData.name, useClockApp) }
                 } else {
-                    setTimer(ctx, inputData.duration.toJavaDuration(), inputData.name)
+                    setTimer(ctx, inputData.duration.toJavaDuration(), inputData.name, useClockApp)
                 }
             }
             is Timer.Query -> {
-                queryTimer(ctx, inputData.name)
+                if (clockAppHandlesExisting && ClockAppTimer.showTimers(ctx.android)) {
+                    TimerOutput.OpenedClockAppTimers
+                } else {
+                    queryTimer(ctx, inputData.name)
+                }
             }
-            is Timer.Cancel -> {
+            is Timer.Cancel -> if (clockAppHandlesExisting && ClockAppTimer.showTimers(ctx.android)) {
+                TimerOutput.OpenedClockAppTimers
+            } else {
                 if (inputData.name == null && SET_TIMERS.size > 1) {
                     TimerOutput.ConfirmCancel(yesNoData) { cancelTimer(ctx, null) }
                 } else {
@@ -46,6 +58,21 @@ class TimerSkill(
                 }
             }
         }
+    }
+
+    private suspend fun setTimer(
+        ctx: SkillContext,
+        duration: Duration,
+        name: String?,
+        useClockApp: Boolean,
+    ): SkillOutput {
+        if (useClockApp && ClockAppTimer.canSet(ctx.android, duration) &&
+            ClockAppTimer.set(ctx.android, duration, name)
+        ) {
+            return TimerOutput.SetInClockApp(duration.toMillis(), name)
+        }
+        // no Clock app supports timers (or the duration is longer than a day): use Dicio's own
+        return setTimer(ctx, duration, name)
     }
 
     private suspend fun setTimer(
