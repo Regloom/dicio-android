@@ -247,4 +247,10 @@
     <string name="failed_to_copy">Не могу скопировать в буфер обмена</string>
     <string name="skill_translation_auto">Автоматически</string>
     <string name="skill_search_duckduckgo_recaptcha">DuckDuckGo не дал результатов, необходимо решить капчу</string>
+    <string name="skill_search_opened_in_browser">Ищу «%1$s» в браузере</string>
+    <string name="pref_search_engine_duckduckgo_description">Результаты показываются в Dicio</string>
+    <string name="pref_search_engine_browser">Открыть в браузере</string>
+    <string name="pref_search_engine_browser_description">Поиск открывается в браузере по умолчанию</string>
+    <string name="pref_search_browser_url">Адрес поиска</string>
+    <string name="pref_search_browser_url_default">%%s заменяется запросом. По умолчанию: %1$s</string>
 </resources>
