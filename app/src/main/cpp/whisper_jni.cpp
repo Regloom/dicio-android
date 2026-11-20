@@ -10,14 +10,24 @@
 
 #define JNI_FN(name) Java_org_stypox_dicio_io_input_whisper_WhisperNative_##name
 
+static void log_callback(ggml_log_level level, const char *text, void * /* user_data */) {
+    int priority = ANDROID_LOG_DEBUG;
+    if (level == GGML_LOG_LEVEL_ERROR) priority = ANDROID_LOG_ERROR;
+    else if (level == GGML_LOG_LEVEL_WARN) priority = ANDROID_LOG_WARN;
+    else if (level == GGML_LOG_LEVEL_INFO) priority = ANDROID_LOG_INFO;
+    __android_log_write(priority, TAG, text);
+}
+
 extern "C" {
 
 JNIEXPORT jlong JNICALL
 JNI_FN(initContext)(JNIEnv *env, jobject /* thiz */, jstring modelPath) {
+    whisper_log_set(log_callback, nullptr);
     const char *path = env->GetStringUTFChars(modelPath, nullptr);
     whisper_context_params cparams = whisper_context_default_params();
     cparams.use_gpu = false;
-    whisper_context *ctx = whisper_init_from_file_with_params(path, cparams);
+    // the state is created anew for each transcription, see transcribe()
+    whisper_context *ctx = whisper_init_from_file_with_params_no_state(path, cparams);
     if (ctx == nullptr) {
         LOGW("Could not load model %s", path);
     }
@@ -32,39 +42,62 @@ JNI_FN(freeContext)(JNIEnv * /* env */, jobject /* thiz */, jlong contextPtr) {
 
 JNIEXPORT jbyteArray JNICALL
 JNI_FN(transcribe)(JNIEnv *env, jobject /* thiz */, jlong contextPtr, jfloatArray samples,
-                   jstring language, jint threads) {
+                   jstring language, jstring prompt, jint threads) {
     auto *ctx = reinterpret_cast<whisper_context *>(contextPtr);
     const char *lang = env->GetStringUTFChars(language, nullptr);
+    const char *promptChars = env->GetStringUTFChars(prompt, nullptr);
     jfloat *data = env->GetFloatArrayElements(samples, nullptr);
     const jsize length = env->GetArrayLength(samples);
 
     whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     params.n_threads = threads;
     params.language = lang;
+    // examples of typical commands: biases the decoder towards the words they contain
+    params.initial_prompt = promptChars[0] == '\0' ? nullptr : promptChars;
     params.translate = false;
     params.no_context = true;
     params.no_timestamps = true;
     params.single_segment = true;  // voice commands are short
     params.suppress_blank = true;
     params.suppress_nst = true;    // no "[music]"-like non-speech tokens
+    // Whisper always encodes a 30s window (1500 audio frames, 50 per second) by default, even for a
+    // 2s command; limiting the encoder context to the actual audio length (plus some margin) makes
+    // short utterances several times faster, as in whisper.cpp's stream example
+    const int audioCtx = static_cast<int>(length / 16000.0 * 50.0) + 128;
+    params.audio_ctx = audioCtx < 1500 ? audioCtx : 0;
     params.print_special = false;
     params.print_progress = false;
     params.print_realtime = false;
     params.print_timestamps = false;
 
+    // A fresh state for every utterance: reusing one state across calls with a different
+    // audio_ctx corrupts the following transcriptions (e.g. "Который час" -> "Катерина, которые
+    // час" for the very same audio). Creating a state takes a few tens of ms, the model weights
+    // stay loaded in the context.
     std::string text;
-    const int result = whisper_full(ctx, params, data, length);
-    if (result == 0) {
-        const int segments = whisper_full_n_segments(ctx);
-        for (int i = 0; i < segments; ++i) {
-            text += whisper_full_get_segment_text(ctx, i);
-        }
+    int result = -1;
+    whisper_state *state = whisper_init_state(ctx);
+    if (state == nullptr) {
+        LOGW("Could not create whisper state");
     } else {
-        LOGW("whisper_full failed with code %d", result);
+        const int64_t start = ggml_time_us();
+        result = whisper_full_with_state(ctx, state, params, data, length);
+        LOGI("whisper_full: %d samples, audio_ctx %d, %d threads, %lld ms",
+             length, params.audio_ctx, threads, (long long) ((ggml_time_us() - start) / 1000));
+        if (result == 0) {
+            const int segments = whisper_full_n_segments_from_state(state);
+            for (int i = 0; i < segments; ++i) {
+                text += whisper_full_get_segment_text_from_state(state, i);
+            }
+        } else {
+            LOGW("whisper_full failed with code %d", result);
+        }
+        whisper_free_state(state);
     }
 
     env->ReleaseFloatArrayElements(samples, data, JNI_ABORT);
     env->ReleaseStringUTFChars(language, lang);
+    env->ReleaseStringUTFChars(prompt, promptChars);
     if (result != 0) {
         return nullptr;
     }

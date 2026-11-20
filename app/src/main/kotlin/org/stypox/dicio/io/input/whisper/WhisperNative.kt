@@ -30,12 +30,14 @@ internal object WhisperNative {
     /**
      * @param samples mono 16kHz PCM audio, in the range [-1, 1]
      * @param language ISO 639-1 code (e.g. "ru"), or "auto"
+     * @param prompt text shown to the decoder before the audio (e.g. example commands), or ""
      * @return the UTF-8 encoded transcription, or `null` on error
      */
     external fun transcribe(
         contextPtr: Long,
         samples: FloatArray,
         language: String,
+        prompt: String,
         threads: Int,
     ): ByteArray?
 

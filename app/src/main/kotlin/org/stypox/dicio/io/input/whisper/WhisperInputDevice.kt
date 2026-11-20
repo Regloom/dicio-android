@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import org.stypox.dicio.BuildConfig
 import org.stypox.dicio.di.LocaleManager
 import org.stypox.dicio.io.input.InputEvent
 import org.stypox.dicio.io.input.SttInputDevice
@@ -227,7 +228,8 @@ class WhisperInputDevice(
                 throw IOException("Whisper model is not loaded")
             }
             WhisperNative.transcribe(
-                contextPtr, samples, language, WhisperNative.preferredThreadCount
+                contextPtr, samples, language, PROMPTS[language] ?: "",
+                WhisperNative.preferredThreadCount
             )
         } ?: throw IOException("Whisper could not transcribe the audio")
 
@@ -266,9 +268,10 @@ class WhisperInputDevice(
         var audio = ShortArray(SAMPLE_RATE * 10)
         var audioLength = 0
         var elapsedMs = 0
-        var noiseFloor = 0.0
+        var noiseFloor = INITIAL_NOISE_FLOOR
         var speechFrames = 0
         var silenceAfterSpeechMs = 0
+        var maxRms = 0.0
 
         recorder.startRecording()
         try {
@@ -289,19 +292,26 @@ class WhisperInputDevice(
                     sum += frame[i].toDouble() * frame[i]
                 }
                 val rms = sqrt(sum / read)
+                maxRms = max(maxRms, rms)
 
-                if (elapsedMs <= CALIBRATION_MS) {
-                    // the first few frames measure the background noise level
-                    noiseFloor = if (noiseFloor == 0.0) rms else (noiseFloor + rms) / 2
+                if (elapsedMs <= IGNORE_START_MS) {
+                    // the microphone picks up Dicio's own "listening" sound, played right when
+                    // listening starts: it is neither speech nor background noise
                     continue
+                }
+
+                // the noise floor follows quiet frames quickly and loud ones very slowly, so it
+                // tracks the background noise and not the speech
+                noiseFloor = if (rms < noiseFloor) {
+                    noiseFloor * 0.7 + rms * 0.3
+                } else {
+                    noiseFloor * 0.995 + rms * 0.005
                 }
 
                 if (rms > max(noiseFloor * SPEECH_TO_NOISE_RATIO, MIN_SPEECH_RMS)) {
                     speechFrames += 1
                     silenceAfterSpeechMs = 0
                 } else {
-                    // slowly adapt to changes in background noise
-                    noiseFloor = noiseFloor * 0.95 + rms * 0.05
                     if (speechFrames >= MIN_SPEECH_FRAMES) {
                         silenceAfterSpeechMs += read * 1000 / SAMPLE_RATE
                     }
@@ -319,18 +329,46 @@ class WhisperInputDevice(
         } finally {
             recorder.stop()
             recorder.release()
+            Log.d(TAG, "Recorded ${elapsedMs}ms: noise floor ${noiseFloor.toInt()}, " +
+                    "max rms ${maxRms.toInt()}, speech frames $speechFrames, " +
+                    "cancelled $cancelRequested, finished by user $finishRequested")
+            if (BuildConfig.DEBUG) {
+                saveDebugWav(audio, audioLength)
+            }
         }
 
-        if (cancelRequested || speechFrames < MIN_SPEECH_FRAMES) {
+        if (cancelRequested || (speechFrames < MIN_SPEECH_FRAMES && !finishRequested)) {
             return null
         }
 
-        // whisper.cpp refuses inputs shorter than one second, so pad with silence
-        val samples = FloatArray(max(audioLength, SAMPLE_RATE + SAMPLE_RATE / 10))
-        for (i in 0 until audioLength) {
-            samples[i] = audio[i] / 32768.0f
+        // drop the loudest part of Dicio's "listening" sound at the beginning, otherwise Whisper
+        // sometimes transcribes it as a word; then pad with silence, since whisper.cpp refuses
+        // inputs shorter than one second
+        val skip = minOf(DROP_START_SAMPLES, audioLength)
+        val samples = FloatArray(max(audioLength - skip, SAMPLE_RATE + SAMPLE_RATE / 10))
+        for (i in skip until audioLength) {
+            samples[i - skip] = audio[i] / 32768.0f
         }
         return samples
+    }
+
+    /** Saves the last recording to the cache directory, to tune the voice activity detector. */
+    private fun saveDebugWav(audio: ShortArray, length: Int) {
+        try {
+            val dataSize = length * 2
+            val buffer = java.nio.ByteBuffer.allocate(44 + dataSize)
+                .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            buffer.put("RIFF".toByteArray()).putInt(36 + dataSize).put("WAVE".toByteArray())
+            buffer.put("fmt ".toByteArray()).putInt(16).putShort(1).putShort(1)
+                .putInt(SAMPLE_RATE).putInt(SAMPLE_RATE * 2).putShort(2).putShort(16)
+            buffer.put("data".toByteArray()).putInt(dataSize)
+            for (i in 0 until length) {
+                buffer.putShort(audio[i])
+            }
+            File(cacheDir, "whisper-last.wav").writeBytes(buffer.array())
+        } catch (e: Exception) {
+            Log.w(TAG, "Can't save debug recording", e)
+        }
     }
 
     private suspend fun freeModel() {
@@ -358,13 +396,27 @@ class WhisperInputDevice(
 
         private const val SAMPLE_RATE = 16000
         private const val FRAME_SAMPLES = SAMPLE_RATE * 30 / 1000 // 30ms
-        private const val CALIBRATION_MS = 240
-        private const val SPEECH_TO_NOISE_RATIO = 3.0
-        private const val MIN_SPEECH_RMS = 300.0
-        private const val MIN_SPEECH_FRAMES = 5 // 150ms
+        private const val IGNORE_START_MS = 700
+        private const val DROP_START_SAMPLES = SAMPLE_RATE * 400 / 1000
+        private const val INITIAL_NOISE_FLOOR = 40.0
+        private const val SPEECH_TO_NOISE_RATIO = 2.5
+        private const val MIN_SPEECH_RMS = 80.0
+        private const val MIN_SPEECH_FRAMES = 8 // 240ms
         private const val END_OF_SPEECH_SILENCE_MS = 900
         private const val NO_SPEECH_TIMEOUT_PER_SILENCE_MS = 3000
-        private const val MAX_RECORDING_MS = 20000
+        private const val MAX_RECORDING_MS = 12000
+
+        /**
+         * Examples of typical commands, passed to Whisper as initial prompt: the decoder then
+         * prefers these words and their spelling (digits, no filler words).
+         */
+        private val PROMPTS = mapOf(
+            "ru" to "Который час? Включи фонарик. Поставь таймер на 5 минут. Какая погода в " +
+                    "Москве? Найди рецепт борща. Позвони маме. Расскажи анекдот. Открой YouTube. " +
+                    "Переведи на английский. Сколько будет 25 умножить на 4?",
+            "en" to "What time is it? Turn on the flashlight. Set a timer for 5 minutes. What's " +
+                    "the weather in London? Search for pizza recipes. Call mom. Tell me a joke.",
+        )
 
         /**
          * Phrases that Whisper is known to hallucinate on noise, since it was trained on subtitles.
