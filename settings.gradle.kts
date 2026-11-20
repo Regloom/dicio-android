@@ -65,7 +65,8 @@ fun findInVersionCatalog(versionIdentifier: String): String {
 val includeGitRepos: List<IncludeGitRepo> = listOf(
     IncludeGitRepo(
         name = "dicio-numbers",
-        uri = "https://github.com/Stypox/dicio-numbers",
+        // fork with Russian support (branch "russian"), until it is merged upstream
+        uri = "https://github.com/Regloom/dicio-numbers",
         projectPath = ":numbers",
         commit = findInVersionCatalog("dicioNumbers"),
     ),
