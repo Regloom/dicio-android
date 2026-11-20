@@ -80,6 +80,10 @@
     <string name="pref_input_method_summary">Choose the service to use to talk to Dicio</string>
     <string name="pref_input_method_text">Only text box</string>
     <string name="pref_input_method_vosk">Vosk offline speech recognition</string>
+    <string name="pref_input_method_whisper">Whisper offline speech recognition</string>
+    <string name="pref_input_method_whisper_summary">Downloads and runs a Whisper model (whisper.cpp) offline inside Dicio. More accurate than Vosk, but transcribes only after you stop talking</string>
+    <string name="pref_whisper_model_url">Whisper model URL</string>
+    <string name="pref_whisper_model_url_default">Link to a ggml model file. Default: %1$s</string>
     <string name="pref_input_method_vosk_summary">Downloads and runs a Vosk SpeechToText model offline inside Dicio</string>
     <string name="pref_input_method_external_popup">External SpeechToText popup</string>
     <string name="pref_input_method_external_popup_summary">Opens the UI of another app through ACTION\u200B_\u200BRECOGNIZE\u200B_\u200BSPEECH, for example whisperIME, Kõnele, Futo Voice Input</string>

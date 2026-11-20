@@ -133,6 +133,14 @@ private fun MainSettingsScreen(
                 viewModel::setInputDevice,
             )
         }
+        if (settings.inputDevice == InputDevice.INPUT_DEVICE_WHISPER) {
+            item {
+                whisperModelUrl().Render(
+                    settings.whisperModelUrl,
+                    viewModel::setWhisperModelUrl,
+                )
+            }
+        }
         val wakeDevice = when (val device = settings.wakeDevice) {
             WakeDevice.UNRECOGNIZED,
             WakeDevice.WAKE_DEVICE_UNSET -> WakeDevice.WAKE_DEVICE_OWW

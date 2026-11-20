@@ -42,6 +42,22 @@ android {
         ndk {
             abiFilters += arrayOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
         }
+
+        externalNativeBuild {
+            cmake {
+                // whisper.cpp is only practical on arm64 phones, other ABIs run without it
+                abiFilters += "arm64-v8a"
+                arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+            }
+        }
+    }
+
+    ndkVersion = "27.0.12077973"
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "4.1.2"
+        }
     }
 
     buildTypes {

@@ -8,12 +8,14 @@ import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.InvertColors
 import androidx.compose.material.icons.filled.KeyboardAlt
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Minimize
 import androidx.compose.material.icons.filled.MusicNote
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.SpeakerPhone
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import org.stypox.dicio.R
+import org.stypox.dicio.io.input.whisper.WhisperInputDevice
 import org.stypox.dicio.settings.datastore.InputDevice
 import org.stypox.dicio.settings.datastore.Language
 import org.stypox.dicio.settings.datastore.SpeechOutputDevice
@@ -33,6 +36,7 @@ import org.stypox.dicio.settings.datastore.WakeDevice
 import org.stypox.dicio.settings.ui.BooleanSetting
 import org.stypox.dicio.settings.ui.IntSetting
 import org.stypox.dicio.settings.ui.ListSetting
+import org.stypox.dicio.settings.ui.StringSetting
 
 
 @Composable
@@ -115,6 +119,12 @@ fun inputDevice() = ListSetting(
             icon = Icons.Default.Mic,
         ),
         ListSetting.Value(
+            value = InputDevice.INPUT_DEVICE_WHISPER,
+            name = stringResource(R.string.pref_input_method_whisper),
+            description = stringResource(R.string.pref_input_method_whisper_summary),
+            icon = Icons.Default.GraphicEq,
+        ),
+        ListSetting.Value(
             value = InputDevice.INPUT_DEVICE_EXTERNAL_POPUP,
             name = stringResource(R.string.pref_input_method_external_popup),
             description = stringResource(R.string.pref_input_method_external_popup_summary),
@@ -180,6 +190,15 @@ fun sttSilenceDuration() = IntSetting(
     description = @Composable { stringResource(R.string.pref_stt_silence_duration_description, it) },
     minimum = 1,
     maximum = 7,
+)
+
+@Composable
+fun whisperModelUrl() = StringSetting(
+    title = stringResource(R.string.pref_whisper_model_url),
+    icon = Icons.Default.Link,
+    descriptionWhenEmpty = stringResource(
+        R.string.pref_whisper_model_url_default, WhisperInputDevice.DEFAULT_MODEL_URL
+    ),
 )
 
 @Composable
