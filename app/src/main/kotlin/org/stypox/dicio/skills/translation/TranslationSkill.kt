@@ -22,8 +22,9 @@ class TranslationSkill(correspondingSkillInfo: SkillInfo, data: StandardRecogniz
             ?: TRANSLATE_SUPPORTED_LOCALES.firstOrNull { language.locale.startsWith(it.lowercase()) }
     }
 
-    // This connects to lingva.ml which runs the Lingva Translate frontend to Google Translate
-    // TODO: Add more servers in like Libre Translate or DeepL
+    // This connects to the free MyMemory API (no key needed, anonymous use is limited to a few
+    // thousand characters per day); lingva.ml and the other Lingva frontends to Google Translate
+    // stopped working, since Google blocks them.
     override suspend fun generateOutput(ctx: SkillContext, inputData: Translation): SkillOutput {
         val input = when (inputData) { is Translate -> inputData }
         // we can use !! because the TranslationInfo would have declared this skill unavailable
@@ -35,8 +36,8 @@ class TranslationSkill(correspondingSkillInfo: SkillInfo, data: StandardRecogniz
         val cldr = CldrLanguages[ctx.locale.language]!!
 
         // extract the query from the input
-        val query = ConnectionUtils.percentEncode(
-            input.query ?: return TranslationOutput.EmptyQuery
+        val query = ConnectionUtils.urlEncode(
+            input.query?.trim()?.takeIf { it.isNotEmpty() } ?: return TranslationOutput.EmptyQuery
         )
 
         // Extract language data from input, then convert the language's to language codes.
@@ -68,24 +69,28 @@ class TranslationSkill(correspondingSkillInfo: SkillInfo, data: StandardRecogniz
         val targetLanguage = cldr.codeToLanguageOrDefault(target)
 
         // make the API call
-        val translation = ConnectionUtils.getPageJson("$TRANSLATE_URL/$source/$target/$query")
-        if (!translation.has("translation")) {
+        val langPair = ConnectionUtils.urlEncode(
+            (if (source == "auto") "autodetect" else source) + "|" + target
+        )
+        val response = ConnectionUtils.getPageJson("$TRANSLATE_URL?q=$query&langpair=$langPair")
+        val translation = response.optJSONObject("responseData")?.optString("translatedText")
+        if (response.optInt("responseStatus") != 200 || translation.isNullOrEmpty()) {
             return TranslationOutput.ApiError(
-                error = translation.optString("error"),
+                error = response.optString("responseDetails"),
                 sourceLanguage = sourceLanguage,
                 targetLanguage = targetLanguage,
             )
         }
 
         return TranslationOutput.Success(
-            translation = translation.getString("translation"),
+            translation = translation,
             sourceLanguage = sourceLanguage,
             targetLanguage = targetLanguage,
         )
     }
 
     companion object {
-        private const val TRANSLATE_URL = "https://lingva.ml/api/v1"
+        private const val TRANSLATE_URL = "https://api.mymemory.translated.net/get"
         val TRANSLATE_SUPPORTED_LOCALES = listOf(
             "af", "sq", "am", "ar", "hy", "as", "ay", "az", "bm", "eu",
             "be", "bn", "bho", "bs", "bg", "ca", "ceb", "ny", "zh", "zh_HANT",
