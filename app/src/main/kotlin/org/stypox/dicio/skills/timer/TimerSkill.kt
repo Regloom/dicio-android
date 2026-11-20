@@ -41,15 +41,13 @@ class TimerSkill(
                     setTimer(ctx, inputData.duration.toJavaDuration(), inputData.name, useClockApp)
                 }
             }
-            is Timer.Query -> {
-                if (clockAppHandlesExisting && ClockAppTimer.showTimers(ctx.android)) {
-                    TimerOutput.OpenedClockAppTimers
-                } else {
-                    queryTimer(ctx, inputData.name)
-                }
+            is Timer.Query -> if (clockAppHandlesExisting) {
+                queryClockAppTimer(ctx, inputData.name)
+            } else {
+                queryTimer(ctx, inputData.name)
             }
-            is Timer.Cancel -> if (clockAppHandlesExisting && ClockAppTimer.showTimers(ctx.android)) {
-                TimerOutput.OpenedClockAppTimers
+            is Timer.Cancel -> if (clockAppHandlesExisting) {
+                cancelClockAppTimer(ctx)
             } else {
                 if (inputData.name == null && SET_TIMERS.size > 1) {
                     TimerOutput.ConfirmCancel(yesNoData) { cancelTimer(ctx, null) }
@@ -57,6 +55,46 @@ class TimerSkill(
                     cancelTimer(ctx, inputData.name)
                 }
             }
+        }
+    }
+
+    private fun queryClockAppTimer(ctx: SkillContext, name: String?): SkillOutput {
+        val running = ClockAppTimer.runningTimers()
+        val timer = if (name == null) {
+            running.lastOrNull()
+        } else {
+            running.filter { it.name != null }
+                .minByOrNull { StringUtils.customStringDistance(name, it.name!!) }
+        }
+        if (timer == null) {
+            // the timer was not set from Dicio (or Dicio was restarted): show the Clock app
+            return if (ClockAppTimer.showTimers(ctx.android)) {
+                TimerOutput.OpenedClockAppTimers
+            } else {
+                TimerOutput.Query(ctx.getString(R.string.skill_timer_no_active))
+            }
+        }
+        return TimerOutput.Query(
+            formatStringWithName(
+                ctx, timer.name, timer.remainingMillis,
+                if (running.size == 1) R.string.skill_timer_query else R.string.skill_timer_query_last,
+                R.string.skill_timer_query_name,
+            )
+        )
+    }
+
+    private fun cancelClockAppTimer(ctx: SkillContext): SkillOutput {
+        if (ClockAppTimer.expiredTimers().isNotEmpty() || ClockAppTimer.runningTimers().isEmpty()) {
+            // a timer is ringing (or Dicio does not know about the timers): stop the ringing ones
+            if (ClockAppTimer.dismissExpired(ctx.android)) {
+                return TimerOutput.Cancel(ctx.getString(R.string.skill_timer_canceled))
+            }
+        }
+        // the Clock app does not allow other apps to cancel a running timer
+        return if (ClockAppTimer.showTimers(ctx.android)) {
+            TimerOutput.Cancel(ctx.getString(R.string.skill_timer_cancel_in_clock_app))
+        } else {
+            TimerOutput.Cancel(ctx.getString(R.string.skill_timer_no_active))
         }
     }
 

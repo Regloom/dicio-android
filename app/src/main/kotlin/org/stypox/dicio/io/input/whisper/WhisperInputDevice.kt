@@ -228,7 +228,9 @@ class WhisperInputDevice(
                 throw IOException("Whisper model is not loaded")
             }
             WhisperNative.transcribe(
-                contextPtr, samples, language, PROMPTS[language] ?: "",
+                // no initial prompt: on unclear audio Whisper sometimes outputs the prompt itself,
+                // e.g. a "turn on the flashlight" example became a real command
+                contextPtr, samples, language, "",
                 WhisperNative.preferredThreadCount
             )
         } ?: throw IOException("Whisper could not transcribe the audio")
@@ -405,18 +407,6 @@ class WhisperInputDevice(
         private const val END_OF_SPEECH_SILENCE_MS = 900
         private const val NO_SPEECH_TIMEOUT_PER_SILENCE_MS = 3000
         private const val MAX_RECORDING_MS = 12000
-
-        /**
-         * Examples of typical commands, passed to Whisper as initial prompt: the decoder then
-         * prefers these words and their spelling (digits, no filler words).
-         */
-        private val PROMPTS = mapOf(
-            "ru" to "Который час? Включи фонарик. Поставь таймер на 5 минут. Какая погода в " +
-                    "Москве? Найди рецепт борща. Позвони маме. Расскажи анекдот. Открой YouTube. " +
-                    "Переведи на английский. Сколько будет 25 умножить на 4?",
-            "en" to "What time is it? Turn on the flashlight. Set a timer for 5 minutes. What's " +
-                    "the weather in London? Search for pizza recipes. Call mom. Tell me a joke.",
-        )
 
         /**
          * Phrases that Whisper is known to hallucinate on noise, since it was trained on subtitles.

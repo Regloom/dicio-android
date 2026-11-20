@@ -105,9 +105,10 @@
     <string name="skill_timer_expired_name">Время таймера %1$s вышло!</string>
     <string name="skill_timer_set_name">Хорошо, таймер %1$s сработает через %2$s</string>
     <string name="skill_timer_opened_clock_app">Вот таймеры в приложении «Часы»</string>
+    <string name="skill_timer_cancel_in_clock_app">Идущий таймер в «Часах» можно отменить только вручную, вот он</string>
     <string name="pref_timer_app">Где ставить таймер</string>
     <string name="pref_timer_app_clock">Приложение «Часы»</string>
-    <string name="pref_timer_app_clock_description">Таймер ставится в системных «Часах» и сработает, даже если Дисио закрыт. На вопрос, сколько осталось, или просьбу отменить таймер откроются «Часы»</string>
+    <string name="pref_timer_app_clock_description">Таймер ставится в системных «Часах» и сработает, даже если Дисио закрыт. Звонящий таймер Дисио остановит, а идущий можно отменить только в «Часах»</string>
     <string name="pref_timer_app_dicio">Дисио</string>
     <string name="pref_timer_app_dicio_description">Таймер работает внутри Дисио, который может сказать, сколько осталось, и отменить его</string>
     <string name="skill_timer_set">Хорошо, таймер сработает через %1$s</string>

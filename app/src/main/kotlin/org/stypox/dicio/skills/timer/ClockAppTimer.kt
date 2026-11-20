@@ -4,16 +4,27 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.SystemClock
 import android.provider.AlarmClock
 import android.util.Log
 import java.time.Duration
 
 /**
- * Sets timers in the system Clock app through the standard [AlarmClock] intents. There is no
- * standard way to query or cancel a timer of another app, so for those the Clock app's list of
- * timers is shown instead.
+ * Sets timers in the system Clock app through the standard [AlarmClock] intents.
+ *
+ * Other apps can neither query nor cancel the timers of the Clock app: [AlarmClock.ACTION_DISMISS_TIMER]
+ * without a timer URI only stops the timers that are ringing, and the Clock app does not tell the
+ * URIs of the timers it creates. So the timers set from Dicio are remembered here (until Dicio is
+ * closed), to answer how much time is left and to know whether a timer is ringing.
  */
 internal object ClockAppTimer {
+    class Remembered(val name: String?, val endElapsedRealtime: Long) {
+        val remainingMillis: Long get() = endElapsedRealtime - SystemClock.elapsedRealtime()
+    }
+
+    /** Timers set in the Clock app from Dicio, in the order they were set */
+    val timers: MutableList<Remembered> = ArrayList()
+
     private val TAG = ClockAppTimer::class.simpleName
 
     /** [AlarmClock.EXTRA_LENGTH] must be between 1 second and 24 hours */
@@ -33,7 +44,37 @@ internal object ClockAppTimer {
         if (name != null) {
             intent.putExtra(AlarmClock.EXTRA_MESSAGE, name)
         }
-        return start(context, intent)
+        if (!start(context, intent)) {
+            return false
+        }
+        timers.add(Remembered(name, SystemClock.elapsedRealtime() + duration.toMillis()))
+        return true
+    }
+
+    /** Timers that should be ringing now, since their time is up */
+    fun expiredTimers(): List<Remembered> = timers.filter { it.remainingMillis <= 0 }
+
+    /** Timers that are still running */
+    fun runningTimers(): List<Remembered> = timers.filter { it.remainingMillis > 0 }
+
+    /**
+     * Stops the timers of the Clock app that are ringing.
+     * @return whether the Clock app accepted the request
+     */
+    fun dismissExpired(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            return false
+        }
+        val dismissed = start(
+            context,
+            Intent(AlarmClock.ACTION_DISMISS_TIMER)
+                .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+        if (dismissed) {
+            timers.removeAll { it.remainingMillis <= 0 }
+        }
+        return dismissed
     }
 
     /** @return whether the Clock app's list of timers could be opened */
