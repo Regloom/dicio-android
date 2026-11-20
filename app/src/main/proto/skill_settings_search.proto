@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option java_package = "org.stypox.dicio.skills.search";
+option java_multiple_files = true;
+
+enum SearchEngine {
+  // results are scraped from DuckDuckGo and shown inside Dicio
+  SEARCH_ENGINE_DUCKDUCKGO = 0;
+  // the search URL is opened in the default browser
+  SEARCH_ENGINE_BROWSER = 1;
+}
+
+message SkillSettingsSearch {
+  SearchEngine engine = 1;
+  // "%s" is replaced by the url-encoded query; an empty string means the default URL
+  string browser_url = 2;
+}

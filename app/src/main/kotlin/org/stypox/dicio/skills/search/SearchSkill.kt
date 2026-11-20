@@ -8,10 +8,13 @@ import org.dicio.skill.skill.Specificity
 import org.dicio.skill.standard.StandardRecognizerData
 import org.dicio.skill.standard.StandardRecognizerSkill
 import org.jsoup.Jsoup
+import kotlinx.coroutines.flow.first
 import org.jsoup.nodes.Document
 import org.stypox.dicio.sentences.Sentences.Search
+import org.stypox.dicio.skills.search.SearchInfo.searchDataStore
 import org.stypox.dicio.util.ConnectionUtils
 import org.stypox.dicio.util.LocaleUtils
+import org.stypox.dicio.util.ShareUtils
 
 class SearchSkill(
     correspondingSkillInfo: SkillInfo,
@@ -22,8 +25,48 @@ class SearchSkill(
 ) : StandardRecognizerSkill<Search>(correspondingSkillInfo, data, specificity) {
     override suspend fun generateOutput(ctx: SkillContext, inputData: Search): SkillOutput {
         val query = when (inputData) { is Search.Query -> inputData.what }
-        return searchOnDuckDuckGo(ctx, query, askAgainIfNoResult)
+        return search(ctx, query, askAgainIfNoResult)
     }
+}
+
+/** Used when the browser search URL setting is empty. */
+internal const val DEFAULT_BROWSER_SEARCH_URL = "https://duckduckgo.com/?q=%s"
+private const val BROWSER_SEARCH_URL_QUERY_PLACEHOLDER = "%s"
+
+/** Runs the search with the engine chosen in the skill settings. */
+internal suspend fun search(
+    ctx: SkillContext,
+    query: String?,
+    askAgainIfNoResult: Boolean,
+): SearchOutput {
+    val settings = ctx.android.searchDataStore.data.first()
+    return when (settings.engine) {
+        SearchEngine.SEARCH_ENGINE_BROWSER -> searchInBrowser(ctx, query, settings.browserUrl)
+        else -> searchOnDuckDuckGo(ctx, query, askAgainIfNoResult)
+    }
+}
+
+internal fun buildBrowserSearchUrl(urlTemplate: String, query: String): String {
+    val template = urlTemplate.ifBlank { DEFAULT_BROWSER_SEARCH_URL }
+    val encodedQuery = ConnectionUtils.urlEncode(query)
+    return if (template.contains(BROWSER_SEARCH_URL_QUERY_PLACEHOLDER)) {
+        template.replace(BROWSER_SEARCH_URL_QUERY_PLACEHOLDER, encodedQuery)
+    } else {
+        // no placeholder: assume the query goes at the end, e.g. "https://example.org/search?q="
+        template + encodedQuery
+    }
+}
+
+private fun searchInBrowser(
+    ctx: SkillContext,
+    query: String?,
+    urlTemplate: String,
+): SearchOutput {
+    if (query.isNullOrBlank()) {
+        return SearchOutput.NoSearchTerm
+    }
+    ShareUtils.openUrlInBrowser(ctx.android, buildBrowserSearchUrl(urlTemplate, query))
+    return SearchOutput.OpenedInBrowser(query)
 }
 
 private const val DUCK_DUCK_GO_SEARCH_URL = "https://duckduckgo.com/html/?q="

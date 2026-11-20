@@ -73,6 +73,11 @@ sealed interface SearchOutput : SkillOutput {
             ctx.getString(R.string.skill_search_duckduckgo_recaptcha)
     }
 
+    data class OpenedInBrowser(private val query: String) : SearchOutput, HeadlineSpeechSkillOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String =
+            ctx.getString(R.string.skill_search_opened_in_browser, query)
+    }
+
 
     class Data (
         val title: String,
@@ -90,7 +95,7 @@ sealed interface SearchOutput : SkillOutput {
                 ): SkillOutput {
                     // if the search fails again, do not ask the user to retry, to avoid going
                     // on indefinitely
-                    return searchOnDuckDuckGo(ctx, inputData, askAgainIfNoResult = false)
+                    return search(ctx, inputData, askAgainIfNoResult = false)
                 }
             }
 
