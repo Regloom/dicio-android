@@ -248,6 +248,12 @@
     <string name="failed_to_copy">Failed to copy to clipboard</string>
     <string name="skill_translation_auto">Auto</string>
     <string name="skill_search_duckduckgo_recaptcha">DuckDuckGo did not provide results, asking for a Captcha to be solved</string>
+    <string name="skill_search_opened_in_browser">Searching for %1$s in the browser</string>
+    <string name="pref_search_engine_duckduckgo_description">Results are shown inside Dicio</string>
+    <string name="pref_search_engine_browser">Open in browser</string>
+    <string name="pref_search_engine_browser_description">The search is opened in the default browser</string>
+    <string name="pref_search_browser_url">Search URL</string>
+    <string name="pref_search_browser_url_default">%%s is replaced by the query. Default: %1$s</string>
     <string name="skill_notify_message_no_app">The notification says %1$s.</string>
     <string name="skill_notify_message_app">The %1$s notification says %2$s.</string>
     <string name="skill_notify_messages_separator">, </string>
