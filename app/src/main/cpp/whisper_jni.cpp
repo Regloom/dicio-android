@@ -128,4 +128,48 @@ JNI_FN(systemInfo)(JNIEnv *env, jobject /* thiz */) {
     return env->NewStringUTF(whisper_print_system_info());
 }
 
+// ---- Silero voice activity detection, streaming: one 512-sample window (32 ms) at a time ----
+
+JNIEXPORT jlong JNICALL
+JNI_FN(vadInit)(JNIEnv *env, jobject /* thiz */, jstring modelPath) {
+    const char *path = env->GetStringUTFChars(modelPath, nullptr);
+    whisper_vad_context_params params = whisper_vad_default_context_params();
+    params.n_threads = 1;
+    params.use_gpu = false;
+    whisper_vad_context *vctx = whisper_vad_init_from_file_with_params(path, params);
+    if (vctx == nullptr) {
+        LOGW("Could not load VAD model %s", path);
+    }
+    env->ReleaseStringUTFChars(modelPath, path);
+    return reinterpret_cast<jlong>(vctx);
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(vadFree)(JNIEnv * /* env */, jobject /* thiz */, jlong vadPtr) {
+    whisper_vad_free(reinterpret_cast<whisper_vad_context *>(vadPtr));
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(vadReset)(JNIEnv * /* env */, jobject /* thiz */, jlong vadPtr) {
+    whisper_vad_reset_state(reinterpret_cast<whisper_vad_context *>(vadPtr));
+}
+
+/** @return the speech probability (0..1) of the samples, keeping the LSTM state across calls */
+JNIEXPORT jfloat JNICALL
+JNI_FN(vadSpeechProbability)(JNIEnv *env, jobject /* thiz */, jlong vadPtr, jfloatArray samples) {
+    auto *vctx = reinterpret_cast<whisper_vad_context *>(vadPtr);
+    jfloat *data = env->GetFloatArrayElements(samples, nullptr);
+    const jsize length = env->GetArrayLength(samples);
+    float prob = 0.0f;
+    if (whisper_vad_detect_speech_no_reset(vctx, data, length)) {
+        const int n = whisper_vad_n_probs(vctx);
+        const float *probs = whisper_vad_probs(vctx);
+        for (int i = 0; i < n; ++i) {
+            if (probs[i] > prob) prob = probs[i];
+        }
+    }
+    env->ReleaseFloatArrayElements(samples, data, JNI_ABORT);
+    return prob;
+}
+
 } // extern "C"

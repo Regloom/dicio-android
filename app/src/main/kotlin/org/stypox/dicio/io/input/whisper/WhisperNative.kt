@@ -59,6 +59,20 @@ internal object WhisperNative {
 
     external fun systemInfo(): String
 
+    /** @return a pointer to a Silero VAD context, or 0 if the model could not be loaded */
+    external fun vadInit(modelPath: String): Long
+
+    external fun vadFree(vadPtr: Long)
+
+    /** Clears the VAD's recurrent state, call it before each utterance */
+    external fun vadReset(vadPtr: Long)
+
+    /**
+     * @param samples a 512-sample (32 ms) window of 16 kHz audio in [-1, 1]
+     * @return the probability that the window contains speech
+     */
+    external fun vadSpeechProbability(vadPtr: Long, samples: FloatArray): Float
+
     /**
      * The number of "big" cores, i.e. those whose maximum frequency is above the minimum among all
      * cores, since whisper.cpp only slows down when the little cores get some of the work.
