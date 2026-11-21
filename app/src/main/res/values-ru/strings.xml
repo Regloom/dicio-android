@@ -225,6 +225,17 @@
     <string name="waiting">Ожидание…</string>
     <string name="pref_input_method_whisper">автономное распознавание речи Whisper</string>
     <string name="pref_input_method_whisper_summary">Скачивает и запускает модель Whisper (whisper.cpp) внутри Дисио. Точнее Vosk, но распознаёт фразу только после того, как вы замолчите</string>
+    <string name="pref_whisper_model">Модель Whisper</string>
+    <string name="pref_whisper_model_base">Base</string>
+    <string name="pref_whisper_model_base_summary">Самая быстрая, наименее точная</string>
+    <string name="pref_whisper_model_small">Small</string>
+    <string name="pref_whisper_model_small_summary">Баланс скорости и точности</string>
+    <string name="pref_whisper_model_large_turbo">Large v3 turbo</string>
+    <string name="pref_whisper_model_large_turbo_summary">Самая точная, медленнее и требует много памяти</string>
+    <string name="pref_whisper_model_custom">Своя</string>
+    <string name="pref_whisper_model_custom_summary">Любая модель ggml по ссылке</string>
+    <string name="pref_whisper_model_size">%1$d МБ</string>
+    <string name="pref_whisper_model_too_big">может не поместиться в память устройства</string>
     <string name="pref_whisper_model_url">Ссылка на модель Whisper</string>
     <string name="pref_whisper_model_url_default">Ссылка на файл модели ggml. По умолчанию: %1$s</string>
     <string name="pref_input_method_vosk_summary">Скачивает и запускает модель распознавания речи Vosk внутри Дисио</string>

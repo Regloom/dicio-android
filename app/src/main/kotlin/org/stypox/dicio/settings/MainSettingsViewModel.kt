@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import org.stypox.dicio.di.WakeDeviceWrapper
 import org.stypox.dicio.io.wake.oww.OpenWakeWordDevice
 import org.stypox.dicio.settings.datastore.InputDevice
+import org.stypox.dicio.settings.datastore.WhisperModel
 import org.stypox.dicio.settings.datastore.Language
 import org.stypox.dicio.settings.datastore.SpeechOutputDevice
 import org.stypox.dicio.settings.datastore.SttPlaySound
@@ -71,6 +72,8 @@ class MainSettingsViewModel @Inject constructor(
         updateData { it.setSpeechOutputDevice(value) }
     fun setSttPlaySound(value: SttPlaySound) =
         updateData { it.setSttPlaySound(value) }
+    fun setWhisperModel(value: WhisperModel) =
+        updateData { it.setWhisperModel(value) }
     fun setWhisperModelUrl(value: String) =
         updateData { it.setWhisperModelUrl(value.trim()) }
     fun setSttSilenceDuration(value: Int) =

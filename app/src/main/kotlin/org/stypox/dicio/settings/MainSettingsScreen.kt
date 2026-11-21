@@ -34,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import org.stypox.dicio.R
 import org.stypox.dicio.io.input.SttInputDevice
 import org.stypox.dicio.settings.datastore.InputDevice
+import org.stypox.dicio.settings.datastore.WhisperModel
 import org.stypox.dicio.settings.datastore.Language
 import org.stypox.dicio.settings.datastore.SpeechOutputDevice
 import org.stypox.dicio.settings.datastore.SttPlaySound
@@ -134,11 +135,21 @@ private fun MainSettingsScreen(
             )
         }
         if (settings.inputDevice == InputDevice.INPUT_DEVICE_WHISPER) {
+            val whisperModel = when (val model = settings.whisperModel) {
+                WhisperModel.UNRECOGNIZED,
+                WhisperModel.WHISPER_MODEL_UNSET -> WhisperModel.WHISPER_MODEL_SMALL
+                else -> model
+            }
             item {
-                whisperModelUrl().Render(
-                    settings.whisperModelUrl,
-                    viewModel::setWhisperModelUrl,
-                )
+                whisperModel().Render(whisperModel, viewModel::setWhisperModel)
+            }
+            if (whisperModel == WhisperModel.WHISPER_MODEL_CUSTOM) {
+                item {
+                    whisperModelUrl().Render(
+                        settings.whisperModelUrl,
+                        viewModel::setWhisperModelUrl,
+                    )
+                }
             }
         }
         val wakeDevice = when (val device = settings.wakeDevice) {

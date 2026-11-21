@@ -25,6 +25,9 @@ import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.SpeakerPhone
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import androidx.compose.runtime.remember
+import org.stypox.dicio.settings.datastore.WhisperModel
 import org.stypox.dicio.R
 import org.stypox.dicio.io.input.whisper.WhisperInputDevice
 import org.stypox.dicio.settings.datastore.InputDevice
@@ -191,6 +194,53 @@ fun sttSilenceDuration() = IntSetting(
     minimum = 1,
     maximum = 7,
 )
+
+@Composable
+fun whisperModel(): ListSetting<WhisperModel> {
+    // a model needs roughly twice its file size in RAM; warn above 45% of the device memory
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val totalMemory = remember {
+        val info = android.app.ActivityManager.MemoryInfo()
+        context.getSystemService(android.app.ActivityManager::class.java)?.getMemoryInfo(info)
+        info.totalMem
+    }
+    @Composable
+    fun describe(model: WhisperInputDevice.Companion.Model, @StringRes text: Int): String {
+        val size = stringResource(R.string.pref_whisper_model_size, model.sizeMb)
+        val fits = totalMemory <= 0 || model.memoryNeededBytes <= totalMemory * 0.45
+        return stringResource(text) + " · " + size +
+                if (fits) "" else " · " + stringResource(R.string.pref_whisper_model_too_big)
+    }
+    return ListSetting(
+        title = stringResource(R.string.pref_whisper_model),
+        icon = Icons.Default.GraphicEq,
+        possibleValues = listOf(
+            ListSetting.Value(
+                value = WhisperModel.WHISPER_MODEL_BASE,
+                name = stringResource(R.string.pref_whisper_model_base),
+                description = describe(WhisperInputDevice.Companion.Model.BASE,
+                    R.string.pref_whisper_model_base_summary),
+            ),
+            ListSetting.Value(
+                value = WhisperModel.WHISPER_MODEL_SMALL,
+                name = stringResource(R.string.pref_whisper_model_small),
+                description = describe(WhisperInputDevice.Companion.Model.SMALL,
+                    R.string.pref_whisper_model_small_summary),
+            ),
+            ListSetting.Value(
+                value = WhisperModel.WHISPER_MODEL_LARGE_TURBO,
+                name = stringResource(R.string.pref_whisper_model_large_turbo),
+                description = describe(WhisperInputDevice.Companion.Model.LARGE_TURBO,
+                    R.string.pref_whisper_model_large_turbo_summary),
+            ),
+            ListSetting.Value(
+                value = WhisperModel.WHISPER_MODEL_CUSTOM,
+                name = stringResource(R.string.pref_whisper_model_custom),
+                description = stringResource(R.string.pref_whisper_model_custom_summary),
+            ),
+        ),
+    )
+}
 
 @Composable
 fun whisperModelUrl() = StringSetting(

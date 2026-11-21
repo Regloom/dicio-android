@@ -82,6 +82,17 @@
     <string name="pref_input_method_vosk">Vosk offline speech recognition</string>
     <string name="pref_input_method_whisper">Whisper offline speech recognition</string>
     <string name="pref_input_method_whisper_summary">Downloads and runs a Whisper model (whisper.cpp) offline inside Dicio. More accurate than Vosk, but transcribes only after you stop talking</string>
+    <string name="pref_whisper_model">Whisper model</string>
+    <string name="pref_whisper_model_base">Base</string>
+    <string name="pref_whisper_model_base_summary">Fastest, least accurate</string>
+    <string name="pref_whisper_model_small">Small</string>
+    <string name="pref_whisper_model_small_summary">Good balance of speed and accuracy</string>
+    <string name="pref_whisper_model_large_turbo">Large v3 turbo</string>
+    <string name="pref_whisper_model_large_turbo_summary">Most accurate, slower and needs a lot of memory</string>
+    <string name="pref_whisper_model_custom">Custom</string>
+    <string name="pref_whisper_model_custom_summary">Any ggml model, by URL</string>
+    <string name="pref_whisper_model_size">%1$d MB</string>
+    <string name="pref_whisper_model_too_big">may not fit in this device\'s memory</string>
     <string name="pref_whisper_model_url">Whisper model URL</string>
     <string name="pref_whisper_model_url_default">Link to a ggml model file. Default: %1$s</string>
     <string name="pref_input_method_vosk_summary">Downloads and runs a Vosk SpeechToText model offline inside Dicio</string>

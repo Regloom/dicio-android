@@ -26,6 +26,7 @@ import org.stypox.dicio.io.input.InputEvent
 import org.stypox.dicio.io.input.SttInputDevice
 import org.stypox.dicio.io.input.SttState
 import org.stypox.dicio.ui.util.Progress
+import org.stypox.dicio.settings.datastore.WhisperModel
 import org.stypox.dicio.util.FileToDownload
 import org.stypox.dicio.util.downloadBinaryFilesWithPartial
 import java.io.File
@@ -431,9 +432,36 @@ class WhisperInputDevice(
             "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin"
         private const val VAD_SPEECH_PROBABILITY = 0.5f
 
-        /** Multilingual Whisper small, 5-bit quantized (~190MB) */
-        const val DEFAULT_MODEL_URL =
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin"
+        private const val MODELS_BASE_URL =
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/"
+
+        /** Multilingual Whisper small, 5-bit quantized (181 MB) */
+        const val DEFAULT_MODEL_URL = MODELS_BASE_URL + "ggml-small-q5_1.bin"
+
+        /** The models offered in the settings, with their download size in MB */
+        enum class Model(val fileName: String, val sizeMb: Int) {
+            BASE("ggml-base-q8_0.bin", 78),
+            SMALL("ggml-small-q5_1.bin", 181),
+            LARGE_TURBO("ggml-large-v3-turbo-q5_0.bin", 547);
+
+            val url: String get() = MODELS_BASE_URL + fileName
+
+            /**
+             * Rough memory need: the weights plus whisper.cpp's buffers, which are about the same
+             * size again for these models.
+             */
+            val memoryNeededBytes: Long get() = sizeMb * 2L * 1024 * 1024
+        }
+
+        /** @return the model URL for the settings: a preset, or the custom URL */
+        fun modelUrl(model: WhisperModel, customUrl: String): String {
+            return when (model) {
+                WhisperModel.WHISPER_MODEL_BASE -> Model.BASE.url
+                WhisperModel.WHISPER_MODEL_LARGE_TURBO -> Model.LARGE_TURBO.url
+                WhisperModel.WHISPER_MODEL_CUSTOM -> customUrl.ifBlank { DEFAULT_MODEL_URL }
+                else -> DEFAULT_MODEL_URL
+            }
+        }
 
         private const val SAMPLE_RATE = 16000
         private const val FRAME_SAMPLES = 512 // 32 ms, the Silero VAD window

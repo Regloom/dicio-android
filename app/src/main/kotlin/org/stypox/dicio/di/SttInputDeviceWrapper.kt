@@ -82,7 +82,8 @@ class SttInputDeviceWrapperImpl(
         sttPlaySoundSetting = firstSettings.second
         silencesBeforeStop = dataStore.data.map(SttInputDevice::getSttSilenceDurationOrDefault)
             .toStateFlowDistinctBlockingFirst(scope)
-        whisperModelUrl = dataStore.data.map { it.whisperModelUrl }
+        whisperModelUrl = dataStore.data
+            .map { WhisperInputDevice.modelUrl(it.whisperModel, it.whisperModelUrl) }
             .toStateFlowDistinctBlockingFirst(scope)
         sttInputDevice = buildInputDevice(inputDeviceSetting)
         scope.launch {

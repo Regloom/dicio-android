@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option java_package = "org.stypox.dicio.settings.datastore";
+option java_multiple_files = true;
+
+enum WhisperModel {
+  WHISPER_MODEL_UNSET = 0; // treated as WHISPER_MODEL_SMALL
+  WHISPER_MODEL_BASE = 1;
+  WHISPER_MODEL_SMALL = 2;
+  WHISPER_MODEL_LARGE_TURBO = 3;
+  WHISPER_MODEL_CUSTOM = 4; // uses UserSettings.whisper_model_url
+}
