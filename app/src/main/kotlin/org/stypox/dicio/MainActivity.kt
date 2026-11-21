@@ -176,6 +176,9 @@ class MainActivity : BaseActivity() {
         private val TAG = MainActivity::class.simpleName
         const val ACTION_WAKE_WORD = "org.stypox.dicio.MainActivity.ACTION_WAKE_WORD"
 
+        /** Intent.ACTION_VOICE_ASSIST, hidden in the public SDK */
+        private const val ACTION_VOICE_ASSIST_HIDDEN = "android.intent.action.VOICE_ASSIST"
+
         var isInForeground: Int = 0
             private set
         var isCreated: Int = 0
@@ -183,7 +186,7 @@ class MainActivity : BaseActivity() {
 
         private fun isAssistIntent(intent: Intent?): Boolean {
             return when (intent?.action) {
-                ACTION_ASSIST, ACTION_VOICE_COMMAND,
+                ACTION_ASSIST, ACTION_VOICE_COMMAND, ACTION_VOICE_ASSIST_HIDDEN,
                 RecognizerIntent.ACTION_VOICE_SEARCH_HANDS_FREE -> true
                 else -> false
             }
