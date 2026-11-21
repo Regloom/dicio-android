@@ -63,11 +63,13 @@ class WhisperInputDevice(
     private val filesDir: File = appContext.filesDir
     private val cacheDir: File = appContext.cacheDir
     private val modelFile: File get() = File(filesDir, "whisper-model.bin")
+    private val vadFile: File get() = File(filesDir, "whisper-vad.bin")
 
     private val lock = Any()
     private var currentModelUrl: String = modelUrl.value.ifBlank { DEFAULT_MODEL_URL }
     private var job: Job? = null // download, load or listen job
     private var contextPtr = 0L // only accessed from nativeDispatcher
+    private var vadPtr = 0L // Silero VAD, used while recording; 0 = energy-based fallback
     private var thenStartListening: ((InputEvent) -> Unit)? = null
     private var eventListener: ((InputEvent) -> Unit)? = null
     @Volatile private var finishRequested = false
@@ -85,7 +87,9 @@ class WhisperInputDevice(
     private fun initialState(): SttState {
         return when {
             !WhisperNative.load(nativeLibDir) -> SttState.NotAvailable
-            FileToDownload(currentModelUrl, modelFile).needsToBeDownloaded() -> SttState.NotDownloaded
+            FileToDownload(currentModelUrl, modelFile).needsToBeDownloaded() ||
+                    FileToDownload(VAD_MODEL_URL, vadFile).needsToBeDownloaded() ->
+                SttState.NotDownloaded
             else -> SttState.NotLoaded
         }
     }
@@ -154,7 +158,10 @@ class WhisperInputDevice(
         job = scope.launch(Dispatchers.IO) {
             try {
                 downloadBinaryFilesWithPartial(
-                    urlsFiles = listOf(FileToDownload(url, modelFile)),
+                    urlsFiles = listOf(
+                        FileToDownload(url, modelFile),
+                        FileToDownload(VAD_MODEL_URL, vadFile),
+                    ),
                     httpClient = okHttpClient,
                     cacheDir = cacheDir,
                 ) { progress ->
@@ -179,7 +186,12 @@ class WhisperInputDevice(
             if (contextPtr != 0L) {
                 WhisperNative.freeContext(contextPtr)
             }
+            if (vadPtr != 0L) {
+                WhisperNative.vadFree(vadPtr)
+            }
             contextPtr = WhisperNative.initContext(modelFile.absolutePath)
+            // without the VAD model, recording falls back to the energy-based detector
+            vadPtr = WhisperNative.vadInit(vadFile.absolutePath)
             synchronized(lock) {
                 if (contextPtr == 0L) {
                     _uiState.value = SttState.ErrorLoading(
@@ -275,6 +287,11 @@ class WhisperInputDevice(
         var speechFrames = 0
         var silenceAfterSpeechMs = 0
         var maxRms = 0.0
+        val vad = vadPtr
+        val vadFrame = FloatArray(FRAME_SAMPLES)
+        if (vad != 0L) {
+            WhisperNative.vadReset(vad)
+        }
 
         recorder.startRecording()
         try {
@@ -311,7 +328,18 @@ class WhisperInputDevice(
                     noiseFloor * 0.995 + rms * 0.005
                 }
 
-                if (rms > max(noiseFloor * SPEECH_TO_NOISE_RATIO, MIN_SPEECH_RMS)) {
+                val isSpeech = if (vad != 0L && read == FRAME_SAMPLES) {
+                    // Silero tells speech from noise, unlike the energy threshold, which can't
+                    // find the end of the phrase when background noise is as loud as quiet speech
+                    for (i in 0 until read) {
+                        vadFrame[i] = frame[i] / 32768.0f
+                    }
+                    WhisperNative.vadSpeechProbability(vad, vadFrame) >= VAD_SPEECH_PROBABILITY
+                } else {
+                    rms > max(noiseFloor * SPEECH_TO_NOISE_RATIO, MIN_SPEECH_RMS)
+                }
+
+                if (isSpeech) {
                     speechFrames += 1
                     silenceAfterSpeechMs = 0
                 } else {
@@ -332,7 +360,8 @@ class WhisperInputDevice(
         } finally {
             recorder.stop()
             recorder.release()
-            Log.d(TAG, "Recorded ${elapsedMs}ms: noise floor ${noiseFloor.toInt()}, " +
+            Log.d(TAG, "Recorded ${elapsedMs}ms (${if (vad != 0L) "silero" else "energy"} VAD): " +
+                    "noise floor ${noiseFloor.toInt()}, " +
                     "max rms ${maxRms.toInt()}, speech frames $speechFrames, " +
                     "cancelled $cancelRequested, finished by user $finishRequested")
             if (BuildConfig.DEBUG) {
@@ -380,6 +409,10 @@ class WhisperInputDevice(
                 WhisperNative.freeContext(contextPtr)
                 contextPtr = 0L
             }
+            if (vadPtr != 0L) {
+                WhisperNative.vadFree(vadPtr)
+                vadPtr = 0L
+            }
         }
     }
 
@@ -393,18 +426,23 @@ class WhisperInputDevice(
     companion object {
         private val TAG = WhisperInputDevice::class.simpleName
 
+        /** Silero VAD v6.2.0 converted for whisper.cpp (885 KB), finds the end of the phrase */
+        private const val VAD_MODEL_URL =
+            "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin"
+        private const val VAD_SPEECH_PROBABILITY = 0.5f
+
         /** Multilingual Whisper small, 5-bit quantized (~190MB) */
         const val DEFAULT_MODEL_URL =
             "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin"
 
         private const val SAMPLE_RATE = 16000
-        private const val FRAME_SAMPLES = SAMPLE_RATE * 30 / 1000 // 30ms
+        private const val FRAME_SAMPLES = 512 // 32 ms, the Silero VAD window
         private const val IGNORE_START_MS = 700
         private const val DROP_START_SAMPLES = SAMPLE_RATE * 400 / 1000
         private const val INITIAL_NOISE_FLOOR = 40.0
         private const val SPEECH_TO_NOISE_RATIO = 2.5
         private const val MIN_SPEECH_RMS = 80.0
-        private const val MIN_SPEECH_FRAMES = 8 // 240ms
+        private const val MIN_SPEECH_FRAMES = 8 // 256ms
         private const val END_OF_SPEECH_SILENCE_MS = 650
         private const val NO_SPEECH_TIMEOUT_PER_SILENCE_MS = 3000
         private const val MAX_RECORDING_MS = 12000
