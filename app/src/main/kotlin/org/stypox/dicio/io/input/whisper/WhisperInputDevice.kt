@@ -59,6 +59,7 @@ class WhisperInputDevice(
     // all calls to whisper.cpp go through here, since a context is not thread safe
     private val nativeDispatcher = Dispatchers.Default.limitedParallelism(1)
 
+    private val nativeLibDir: String = appContext.applicationInfo.nativeLibraryDir
     private val filesDir: File = appContext.filesDir
     private val cacheDir: File = appContext.cacheDir
     private val modelFile: File get() = File(filesDir, "whisper-model.bin")
@@ -83,7 +84,7 @@ class WhisperInputDevice(
 
     private fun initialState(): SttState {
         return when {
-            !WhisperNative.isAvailable -> SttState.NotAvailable
+            !WhisperNative.load(nativeLibDir) -> SttState.NotAvailable
             FileToDownload(currentModelUrl, modelFile).needsToBeDownloaded() -> SttState.NotDownloaded
             else -> SttState.NotLoaded
         }
@@ -404,7 +405,7 @@ class WhisperInputDevice(
         private const val SPEECH_TO_NOISE_RATIO = 2.5
         private const val MIN_SPEECH_RMS = 80.0
         private const val MIN_SPEECH_FRAMES = 8 // 240ms
-        private const val END_OF_SPEECH_SILENCE_MS = 900
+        private const val END_OF_SPEECH_SILENCE_MS = 650
         private const val NO_SPEECH_TIMEOUT_PER_SILENCE_MS = 3000
         private const val MAX_RECORDING_MS = 12000
 

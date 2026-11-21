@@ -5,22 +5,38 @@ import java.io.File
 
 /**
  * Thin JNI wrapper around whisper.cpp (see `app/src/main/cpp/whisper_jni.cpp`). The native library
- * is only built for arm64-v8a, so [isAvailable] is `false` on other ABIs. A whisper context must
+ * is only built for arm64-v8a, so [load] returns `false` on other ABIs. A whisper context must
  * not be used from more than one thread at a time.
  */
 internal object WhisperNative {
     private val TAG = WhisperNative::class.simpleName
 
-    val isAvailable: Boolean by lazy {
-        try {
+    @Volatile
+    private var loaded: Boolean? = null
+
+    /**
+     * Loads the JNI library and the best ggml CPU backend variant for this phone.
+     * @param nativeLibDir the app's native library directory, where ggml looks for the CPU
+     * backend variants (the libraries must be extracted, see useLegacyPackaging in build.gradle)
+     * @return false on ABIs without whisper.cpp (it is only built for arm64-v8a)
+     */
+    @Synchronized
+    fun load(nativeLibDir: String): Boolean {
+        loaded?.let { return it }
+        val ok = try {
             System.loadLibrary("dicio_whisper")
+            loadBackends(nativeLibDir)
             Log.i(TAG, "whisper.cpp loaded: ${systemInfo()}")
             true
         } catch (e: UnsatisfiedLinkError) {
             Log.w(TAG, "whisper.cpp native library is not available on this device", e)
             false
         }
+        loaded = ok
+        return ok
     }
+
+    private external fun loadBackends(nativeLibDir: String)
 
     /** @return a pointer to the whisper context, or 0 if the model could not be loaded */
     external fun initContext(modelPath: String): Long
