@@ -53,6 +53,13 @@ android {
     }
 
     ndkVersion = "27.0.12077973"
+    packaging {
+        jniLibs {
+            // extract native libraries to disk: ggml finds its CPU backend variants by listing
+            // the native library directory, which is not possible inside the APK
+            useLegacyPackaging = true
+        }
+    }
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")

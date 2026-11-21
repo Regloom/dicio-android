@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <string>
 #include "whisper.h"
+#include "ggml-backend.h"
 
 #define TAG "DicioWhisper"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -19,6 +20,20 @@ static void log_callback(ggml_log_level level, const char *text, void * /* user_
 }
 
 extern "C" {
+
+JNIEXPORT void JNICALL
+JNI_FN(loadBackends)(JNIEnv *env, jobject /* thiz */, jstring nativeLibDir) {
+    // the ggml CPU backend is built in several variants (libggml-cpu-android_armv*.so); ggml scores
+    // the CPU features and loads the best one available in the app's native library directory
+    const char *dir = env->GetStringUTFChars(nativeLibDir, nullptr);
+    ggml_backend_load_all_from_path(dir);
+    env->ReleaseStringUTFChars(nativeLibDir, dir);
+    for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+        LOGI("ggml backend: %s (%s)", ggml_backend_dev_name(dev),
+             ggml_backend_dev_description(dev));
+    }
+}
 
 JNIEXPORT jlong JNICALL
 JNI_FN(initContext)(JNIEnv *env, jobject /* thiz */, jstring modelPath) {
