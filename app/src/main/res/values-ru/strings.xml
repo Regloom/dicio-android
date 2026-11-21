@@ -117,6 +117,8 @@
     <string name="error_sorry">К сожалению, произошла ошибка</string>
     <string name="error_title">Сообщение об ошибке</string>
     <string name="skill_time_current_time">Сейчас %1$s</string>
+    <string name="skill_time_current_time_city">%1$s: сейчас %2$s</string>
+    <string name="skill_time_city_not_found">Не удалось узнать время в городе %1$s</string>
     <string name="error_report_channel_name">Уведомление с отчетом об ошибке</string>
     <string name="pref_stt_auto_finish_title">Автоматически отправлять распознанный текст</string>
     <string name="pref_stt_auto_finish_summary_on">Автоматически передавать распознанную речь в запрашиваемое приложение по завершению прослушивания</string>
